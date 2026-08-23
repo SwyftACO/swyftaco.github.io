@@ -11,7 +11,7 @@
   --ground:#F3F1F8; --surface:#FFFFFF; --surface-2:#E7E2F2;
   --ink:#1C1726; --ink-muted:#6F6580;
   --gold:#6D28D9; --gold-ink:#FFFFFF;
-  --op-tag:#C0431A; --poke-tag:#1783A8;
+  --op-tag:#C0431A; --poke-tag:#1783A8; --tcg-tag:#1E8E5A;
   --border: rgba(28,23,38,0.13);
   --shadow: 0 1px 2px rgba(28,23,38,0.06), 0 8px 24px rgba(28,23,38,0.08);
 }
@@ -20,7 +20,7 @@
     --ground:#0F0D14; --surface:#18141F; --surface-2:#221C2E;
     --ink:#EDE8F5; --ink-muted:#9C93AD;
     --gold:#A66CFF; --gold-ink:#0F0D14;
-    --op-tag:#E2572C; --poke-tag:#38B6E8;
+    --op-tag:#E2572C; --poke-tag:#38B6E8; --tcg-tag:#34D399;
     --border: rgba(237,232,245,0.10);
     --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 12px 32px rgba(0,0,0,0.45);
   }
@@ -29,7 +29,7 @@
   --ground:#0F0D14; --surface:#18141F; --surface-2:#221C2E;
   --ink:#EDE8F5; --ink-muted:#9C93AD;
   --gold:#A66CFF; --gold-ink:#0F0D14;
-  --op-tag:#E2572C; --poke-tag:#38B6E8;
+  --op-tag:#E2572C; --poke-tag:#38B6E8; --tcg-tag:#34D399;
   --border: rgba(237,232,245,0.10);
   --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 12px 32px rgba(0,0,0,0.45);
 }
@@ -37,7 +37,7 @@
   --ground:#F3F1F8; --surface:#FFFFFF; --surface-2:#E7E2F2;
   --ink:#1C1726; --ink-muted:#6F6580;
   --gold:#6D28D9; --gold-ink:#FFFFFF;
-  --op-tag:#C0431A; --poke-tag:#1783A8;
+  --op-tag:#C0431A; --poke-tag:#1783A8; --tcg-tag:#1E8E5A;
   --border: rgba(28,23,38,0.13);
   --shadow: 0 1px 2px rgba(28,23,38,0.06), 0 8px 24px rgba(28,23,38,0.08);
 }
@@ -94,6 +94,7 @@ body {
 .pill .dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle; }
 .pill[data-p="op"] .dot { background:var(--op-tag); }
 .pill[data-p="pokemon"] .dot { background:var(--poke-tag); }
+.pill[data-p="tcg"] .dot { background:var(--tcg-tag); }
 .pill[data-p="all"] .dot { background:var(--gold); }
 
 .board {
@@ -139,6 +140,7 @@ body {
 .day .dots i { width:5px; height:5px; border-radius:50%; display:block; }
 .day .dots i.op { background:var(--op-tag); }
 .day .dots i.pokemon { background:var(--poke-tag); }
+.day .dots i.tcg { background:var(--tcg-tag); }
 .day:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
 
 .selected-card {
@@ -172,6 +174,7 @@ body {
 }
 .dentry .tag.op { background: color-mix(in srgb, var(--op-tag) 18%, transparent); color:var(--op-tag); }
 .dentry .tag.pokemon { background: color-mix(in srgb, var(--poke-tag) 18%, transparent); color:var(--poke-tag); }
+.dentry .tag.tcg { background: color-mix(in srgb, var(--tcg-tag) 18%, transparent); color:var(--tcg-tag); }
 .dentry .lbl { font-size:13.5px; line-height:1.35; }
 .dentry .days { font-family:'Plex Mono'; font-size:11px; color:var(--ink-muted); margin-top:3px; }
 .dentry.featured .lbl { font-weight:600; }
@@ -223,6 +226,7 @@ a { color:inherit; }
     <button class="pill active" data-p="all"><span class="dot"></span>All</button>
     <button class="pill" data-p="op"><span class="dot"></span>One Piece</button>
     <button class="pill" data-p="pokemon"><span class="dot"></span>Pok&#233;mon</button>
+    <button class="pill" data-p="tcg"><span class="dot"></span>TCG</button>
   </div>
 
   <div class="board">
@@ -341,7 +345,8 @@ function renderDocket(){
     const dayLabel = days===0 ? "Today" : days===1 ? "Tomorrow" : days+" days";
     const hl = selectedDate===e.date ? "hl" : "";
     const feat = e.featured ? "featured" : "";
-    const platLabel = e.platform==='op' ? 'One Piece' : 'Pok\u00e9mon';
+    const PLATFORM_LABELS = { op: 'One Piece', pokemon: 'Pok\u00e9mon', tcg: 'TCG' };
+    const platLabel = PLATFORM_LABELS[e.platform] || e.platform;
     return '<div class="dentry ' + hl + ' ' + feat + '" data-key="' + e.date + '">' +
       '<div class="date-chip"><span class="mon">' + MONTHS_SHORT[d.getMonth()] + '</span><span class="num">' + d.getDate() + '</span></div>' +
       '<div class="body">' +
