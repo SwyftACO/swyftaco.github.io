@@ -54,6 +54,14 @@ body {
 }
 .wrap { max-width:1180px; margin:0 auto; padding: 28px 20px 64px; }
 
+/* Static screenshot mode -- see publish_calendar.py's render_preview_png().
+   Hides the parts that only make sense as something you click (filter pills,
+   the "click a day" empty-state panel) so the Discord embed image is just
+   the month grid + upcoming docket, nothing that looks broken as a still. */
+body.preview-mode .filters,
+body.preview-mode .selected-card,
+body.preview-mode .foot { display:none; }
+
 .masthead {
   display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
   flex-wrap:wrap;
