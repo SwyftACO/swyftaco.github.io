@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Swyft ACO — Sign Up</title>
+<link rel="icon" type="image/png" href="/logo.png">
 <style>
   :root{
     --bg:#0f1115; --bg2:#12151c; --panel:#171a21; --panel2:#1e222b; --border:#2a2f3a;
@@ -17,11 +18,7 @@
   }
   .wrap{max-width:460px; width:100%; text-align:center}
   .brand{display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:28px}
-  .brand-mark{
-    width:40px; height:40px; border-radius:11px; flex-shrink:0;
-    background:linear-gradient(120deg, var(--accent), var(--accent2));
-    display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:1.1rem;
-  }
+  .brand-mark{width:40px; height:40px; border-radius:11px; flex-shrink:0; display:block}
   .brand-name{font-weight:700; font-size:1.1rem}
   h1{font-size:1.65rem; margin:0 0 10px; letter-spacing:-.01em; line-height:1.25}
   p.sub{color:var(--muted); font-size:.98rem; line-height:1.6; margin:0 0 30px}
@@ -58,7 +55,7 @@
 <body>
   <div class="wrap">
     <div class="brand">
-      <div class="brand-mark">⚡</div>
+      <img class="brand-mark" src="/logo.png" alt="Swyft ACO">
       <div class="brand-name">Swyft ACO</div>
     </div>
     <h1>Sign up for free, automated checkouts</h1>
@@ -70,9 +67,9 @@
     </a>
 
     <div class="steps">
-      <b>1.</b> Sign in with Discord — that's how your dashboard knows who you are.<br>
+      <b>1.</b> Sign in with Discord.<br>
       <b>2.</b> Pick a retailer, fill in your info, hit submit.<br>
-      <b>3.</b> That's it. No ticket, no pasting anything — staff gets it automatically and your dashboard updates the moment it's imported.
+      <b>3.</b> Wait for your dashboard to show Live.
     </div>
 
     <p class="footer-note">
