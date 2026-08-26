@@ -299,7 +299,17 @@ function byDate(){
 }
 function daysUntil(dateStr){
   const d = parseDate(dateStr);
-  return Math.round((d - TODAY) / 86400000);
+  // TODAY carries the current time-of-day (see its own comment above), but
+  // d is always local midnight (parseDate never sets hours/minutes). Diffing
+  // those two directly and rounding is what actually caused the reported
+  // bug: checking late in the day (e.g. 11pm) leaves only a small fraction
+  // of "today" remaining, so the raw ms difference to a date 3 calendar-days
+  // out came out to ~2.03 days -- correct math, wrong question. What a
+  // "days until" countdown should answer is a CALENDAR-day difference (today
+  // counts as 0 no matter what time it currently is), so TODAY needs the
+  // same midnight truncation d already has before they're compared.
+  const todayMidnight = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+  return Math.round((d - todayMidnight) / 86400000);
 }
 
 function renderNextDrop(){
