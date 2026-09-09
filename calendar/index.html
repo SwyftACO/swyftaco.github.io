@@ -89,6 +89,24 @@ body.preview-mode .foot { display:none; }
 .next-drop .count small { font-size:14px; font-weight:500; color:var(--ink-muted); margin-left:4px;}
 .next-drop .label { font-size:12.5px; color:var(--ink); margin-top:4px; max-width:260px; }
 
+.masthead-right { display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+
+/* A real, visible entry point this time -- the old footer-only link was
+   too quiet to find (confirmed live 2026-09-09: staff looked right at the
+   page and didn't see it). Small is fine for staff-only chrome; invisible
+   isn't. */
+.staff-login-btn {
+  font-family:'Plex Mono'; font-size:12px; font-weight:600; letter-spacing:0.02em;
+  color:var(--gold); background:var(--surface); border:1px solid var(--gold);
+  border-radius:999px; padding:7px 14px; text-decoration:none; white-space:nowrap;
+}
+.staff-login-btn:hover { background:var(--gold); color:var(--ground); }
+.staff-badge {
+  font-family:'Plex Mono'; font-size:11px; font-weight:600; letter-spacing:0.04em;
+  color:#22c55e; background:var(--surface); border:1px solid #22c55e33;
+  border-radius:999px; padding:6px 12px; white-space:nowrap;
+}
+
 .filters { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
 .pill {
   font-family:'Plex Mono'; font-size:12px; font-weight:500;
@@ -159,9 +177,19 @@ body.preview-mode .foot { display:none; }
 }
 .selected-card .d { font-family:'Anton'; font-size:22px; color:var(--gold); line-height:1; }
 .selected-card .items { margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+.selected-card .item-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .selected-card a.item { display:block; text-decoration:none; color:var(--ink); font-size:13.5px; }
 .selected-card a.item:hover { color: var(--gold); }
 .selected-card .empty { color:var(--ink-muted); font-size:13px; }
+
+.prio-star {
+  font-size:16px; line-height:1; flex-shrink:0; background:none; border:none;
+  cursor:pointer; padding:2px; color:var(--ink-muted); border-radius:6px;
+}
+.prio-star:hover { color:var(--gold); background:var(--surface-2); }
+.prio-star.on { color:var(--gold); }
+.prio-star.static { cursor:default; }
+.prio-star.static:hover { background:none; }
 
 .docket-head { padding:16px 18px; border-bottom:1px solid var(--border); }
 .docket-head h2 { font-family:'Anton'; font-weight:400; font-size:18px; margin:0; letter-spacing:0.3px; text-transform:uppercase; }
@@ -190,14 +218,15 @@ body.preview-mode .foot { display:none; }
 .dentry .lbl { font-size:13.5px; line-height:1.35; }
 .dentry .days { font-family:'Plex Mono'; font-size:11px; color:var(--ink-muted); margin-top:3px; }
 .dentry.featured .lbl { font-weight:600; }
+.dentry .prio-star { align-self:center; }
 
 .foot { text-align:center; margin-top:26px; display:flex; flex-direction:column; align-items:center; gap:10px; }
 .foot a { color:var(--ink-muted); }
 .staff-link {
-  font-family:'Plex Mono'; font-size:10.5px; letter-spacing:0.03em;
-  text-decoration:none; opacity:0.7;
+  font-family:'Plex Mono'; font-size:12px; letter-spacing:0.03em;
+  text-decoration:none; opacity:0.85; color:var(--ink-muted);
 }
-.staff-link:hover { text-decoration:underline; opacity:1; }
+.staff-link:hover { text-decoration:underline; opacity:1; color:var(--gold); }
 
 .sync-strip {
   display:inline-flex; align-items:center; gap:8px;
@@ -236,7 +265,10 @@ a { color:inherit; }
       <p class="wordmark">SWYFT ACO<span>&nbsp;CALENDAR</span></p>
       <div class="subtitle">One Piece, Pok&#233;mon &amp; TCG release calendar &mdash; click a day to see what's dropping</div>
     </div>
-    <div class="next-drop" id="nextDrop"></div>
+    <div class="masthead-right">
+      <div class="next-drop" id="nextDrop"></div>
+      <div id="staffAuth"></div>
+    </div>
   </div>
 
   <div class="filters" id="filters">
@@ -273,7 +305,7 @@ a { color:inherit; }
       <span class="sync-ts">[SYNCED] <span id="genDate"></span></span>
     </div>
     <div class="ai-badge">&#10024; Built &amp; Maintained by AI</div>
-    <a class="staff-link" href="https://34-169-4-0.sslip.io/calendar-priority/manage" target="_blank" rel="noopener">Manage Priority Reminders (Staff)</a>
+    <a class="staff-link" href="https://34-169-4-0.sslip.io/calendar-priority/manage" target="_blank" rel="noopener">Or see/manage every priority flag at once (Staff)</a>
   </div>
 </div>
 
@@ -289,6 +321,52 @@ const BUILT = new Date(2026, 8, 9);
 let filter = "all";
 let view = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
 let selectedDate = null;
+
+// Priority-reminder feature: click a date, mark an event priority, get a
+// reminder posted in #announcements ~24h before it drops. The write side
+// needs a real staff-only backend (this static page has none of its own),
+// so it lives on a separate box -- see vps/calendar_priority_api.py.
+const CAL_API = "https://34-169-4-0.sslip.io/calendar-priority";
+let isStaff = false;
+let priorityFlags = {}; // {event_id: true} -- public, not sensitive; see the API's own /list docstring
+
+function renderStaffAuth(){
+  const el = document.getElementById("staffAuth");
+  if(isStaff){
+    el.innerHTML = '<span class="staff-badge">&#10003; Staff mode</span>';
+  } else {
+    const returnTo = encodeURIComponent(location.href);
+    el.innerHTML = '<a class="staff-login-btn" href="' + CAL_API + '/login?return_to=' + returnTo + '">&#128274; Staff: mark priority</a>';
+  }
+}
+
+function togglePriority(id, btn){
+  const nowOn = !priorityFlags[id];
+  btn.disabled = true;
+  fetch(CAL_API + "/toggle", {
+    method: "POST", credentials: "include",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({event_id: id, priority: nowOn}),
+  }).then(function(r){
+    btn.disabled = false;
+    if(!r.ok){ alert("Could not update -- try refreshing the page."); return; }
+    if(nowOn) priorityFlags[id] = true; else delete priorityFlags[id];
+    renderGrid(); renderSelected(); renderDocket();
+  }).catch(function(){
+    btn.disabled = false;
+    alert("Could not reach the priority service -- try again in a moment.");
+  });
+}
+
+function priorityStarHtml(id){
+  const flagged = !!priorityFlags[id];
+  if(isStaff){
+    return '<button class="prio-star ' + (flagged ? "on" : "") + '" onclick="togglePriority(\'' + id + '\', this)" title="' +
+      (flagged ? "Priority -- click to unflag" : "Mark priority (reminds #announcements ~24h before)") + '">' +
+      (flagged ? "&#11088;" : "&#9734;") + '</button>';
+  }
+  return flagged ? '<span class="prio-star on static" title="Staff-flagged priority drop">&#11088;</span>' : "";
+}
 
 function pad(n){ return String(n).padStart(2,"0"); }
 function dkey(y,m,d){ return y+"-"+pad(m+1)+"-"+pad(d); }
@@ -368,7 +446,12 @@ function renderSelected(){
   const d = parseDate(selectedDate);
   const head = '<div class="d">' + MONTHS_SHORT[d.getMonth()] + ' ' + d.getDate() + '</div>';
   if(!items.length){ el.innerHTML = head + '<div class="empty" style="margin-top:6px;">Nothing tracked for this day.</div>'; return; }
-  const rows = items.map(function(e){ return '<a class="item" href="' + e.link + '" target="_blank" rel="noopener">' + e.label + ' &#8594;</a>'; }).join("");
+  const rows = items.map(function(e){
+    return '<div class="item-row">' +
+      '<a class="item" href="' + e.link + '" target="_blank" rel="noopener">' + e.label + ' &#8594;</a>' +
+      priorityStarHtml(e.id) +
+    '</div>';
+  }).join("");
   el.innerHTML = head + '<div class="items">' + rows + '</div>';
 }
 
@@ -391,11 +474,12 @@ function renderDocket(){
         '<div class="lbl"><a href="' + e.link + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">' + e.label + '</a></div>' +
         '<div class="days">' + dayLabel + '</div>' +
       '</div>' +
+      priorityStarHtml(e.id) +
     '</div>';
   }).join("");
   document.querySelectorAll(".dentry").forEach(function(row){
     row.addEventListener("click", function(ev){
-      if(ev.target.tagName === "A") return;
+      if(ev.target.closest("a, button")) return;
       const key = row.dataset.key;
       selectedDate = key;
       const d = parseDate(key);
@@ -417,7 +501,21 @@ document.querySelectorAll(".pill").forEach(function(p){
 });
 
 renderDow(); renderGrid(); renderSelected(); renderDocket(); renderNextDrop();
+renderStaffAuth();
 document.getElementById("genDate").textContent = BUILT.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+
+// Priority flags (public, see CAL_API's own /list docstring) and staff
+// status load async and re-render once known -- the page is fully usable
+// before either resolves, this only adds the stars / the staff control.
+fetch(CAL_API + "/list").then(function(r){ return r.json(); }).then(function(data){
+  priorityFlags = (data && data.flags) || {};
+  renderGrid(); renderSelected(); renderDocket();
+}).catch(function(){ /* stars just don't show -- never blocks the rest of the page */ });
+
+fetch(CAL_API + "/whoami", {credentials: "include"}).then(function(r){ return r.json(); }).then(function(data){
+  isStaff = !!(data && data.staff);
+  renderStaffAuth(); renderSelected(); renderDocket();
+}).catch(function(){ /* stays logged-out-looking -- never blocks the rest of the page */ });
 </script>
 
 </body></html>
