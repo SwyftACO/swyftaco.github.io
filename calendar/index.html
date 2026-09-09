@@ -89,23 +89,6 @@ body.preview-mode .foot { display:none; }
 .next-drop .count small { font-size:14px; font-weight:500; color:var(--ink-muted); margin-left:4px;}
 .next-drop .label { font-size:12.5px; color:var(--ink); margin-top:4px; max-width:260px; }
 
-.masthead-right { display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
-
-/* A real, visible entry point this time -- the old footer-only link was
-   too quiet to find (confirmed live 2026-09-09: staff looked right at the
-   page and didn't see it). Small is fine for staff-only chrome; invisible
-   isn't. */
-.staff-login-btn {
-  font-family:'Plex Mono'; font-size:12px; font-weight:600; letter-spacing:0.02em;
-  color:var(--gold); background:var(--surface); border:1px solid var(--gold);
-  border-radius:999px; padding:7px 14px; text-decoration:none; white-space:nowrap;
-}
-.staff-login-btn:hover { background:var(--gold); color:var(--ground); }
-.staff-badge {
-  font-family:'Plex Mono'; font-size:11px; font-weight:600; letter-spacing:0.04em;
-  color:#22c55e; background:var(--surface); border:1px solid #22c55e33;
-  border-radius:999px; padding:6px 12px; white-space:nowrap;
-}
 
 .filters { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
 .pill {
@@ -265,10 +248,7 @@ a { color:inherit; }
       <p class="wordmark">SWYFT ACO<span>&nbsp;CALENDAR</span></p>
       <div class="subtitle">One Piece, Pok&#233;mon &amp; TCG release calendar &mdash; click a day to see what's dropping</div>
     </div>
-    <div class="masthead-right">
-      <div class="next-drop" id="nextDrop"></div>
-      <div id="staffAuth"></div>
-    </div>
+    <div class="next-drop" id="nextDrop"></div>
   </div>
 
   <div class="filters" id="filters">
@@ -322,34 +302,50 @@ let filter = "all";
 let view = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
 let selectedDate = null;
 
-// Priority-reminder feature: click a date, mark an event priority, get a
-// reminder posted in #announcements ~24h before it drops. The write side
-// needs a real staff-only backend (this static page has none of its own),
-// so it lives on a separate box -- see vps/calendar_priority_api.py.
+// Priority-reminder feature: click a date, click the star, get a reminder
+// posted in #announcements ~24h before it drops. The write side needs a
+// real backend (this static page has none of its own), so it lives on a
+// separate box -- see vps/calendar_priority_api.py. Auth is a single
+// shared staff passphrase, typed once and kept in this browser's own
+// localStorage, sent as a plain header on every toggle -- no login flow,
+// no redirect, no cross-origin cookie to silently fail (an earlier
+// Discord-OAuth version of this had exactly that problem: confirmed live
+// 2026-09-09 it just didn't work for a real user, almost certainly a
+// browser blocking the third-party cookie the whole flow depended on).
 const CAL_API = "https://34-169-4-0.sslip.io/calendar-priority";
-let isStaff = false;
+const PASS_KEY = "swyft_staff_pass";
 let priorityFlags = {}; // {event_id: true} -- public, not sensitive; see the API's own /list docstring
 
-function renderStaffAuth(){
-  const el = document.getElementById("staffAuth");
-  if(isStaff){
-    el.innerHTML = '<span class="staff-badge">&#10003; Staff mode</span>';
-  } else {
-    const returnTo = encodeURIComponent(location.href);
-    el.innerHTML = '<a class="staff-login-btn" href="' + CAL_API + '/login?return_to=' + returnTo + '">&#128274; Staff: mark priority</a>';
-  }
+function toggleRequest(id, nowOn, pass){
+  return fetch(CAL_API + "/toggle", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Staff-Passphrase": pass || ""},
+    body: JSON.stringify({event_id: id, priority: nowOn}),
+  });
 }
 
 function togglePriority(id, btn){
   const nowOn = !priorityFlags[id];
   btn.disabled = true;
-  fetch(CAL_API + "/toggle", {
-    method: "POST", credentials: "include",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({event_id: id, priority: nowOn}),
-  }).then(function(r){
+  const stored = localStorage.getItem(PASS_KEY) || "";
+  toggleRequest(id, nowOn, stored).then(function(r){
+    if(r.status === 403){
+      // No passphrase yet, or it's wrong -- ask once, right here, and
+      // retry immediately with whatever was entered. This IS the whole
+      // "staff-only" gate; there's no separate login step to find first.
+      const entered = prompt("Staff passphrase (ask Jon if you don't have it):");
+      if(!entered){ btn.disabled = false; return; }
+      return toggleRequest(id, nowOn, entered).then(function(r2){
+        if(!r2.ok){ btn.disabled = false; alert("Wrong passphrase."); return; }
+        localStorage.setItem(PASS_KEY, entered);
+        return true;
+      });
+    }
+    if(!r.ok){ btn.disabled = false; alert("Could not update -- try again in a moment."); return; }
+    return true;
+  }).then(function(succeeded){
     btn.disabled = false;
-    if(!r.ok){ alert("Could not update -- try refreshing the page."); return; }
+    if(!succeeded) return;
     if(nowOn) priorityFlags[id] = true; else delete priorityFlags[id];
     renderGrid(); renderSelected(); renderDocket();
   }).catch(function(){
@@ -359,13 +355,13 @@ function togglePriority(id, btn){
 }
 
 function priorityStarHtml(id){
+  // Always a real, clickable button -- there's no separate "are you
+  // staff" step to find first. The passphrase prompt in togglePriority()
+  // IS the staff gate.
   const flagged = !!priorityFlags[id];
-  if(isStaff){
-    return '<button class="prio-star ' + (flagged ? "on" : "") + '" onclick="togglePriority(\'' + id + '\', this)" title="' +
-      (flagged ? "Priority -- click to unflag" : "Mark priority (reminds #announcements ~24h before)") + '">' +
-      (flagged ? "&#11088;" : "&#9734;") + '</button>';
-  }
-  return flagged ? '<span class="prio-star on static" title="Staff-flagged priority drop">&#11088;</span>' : "";
+  return '<button class="prio-star ' + (flagged ? "on" : "") + '" onclick="togglePriority(\'' + id + '\', this)" title="' +
+    (flagged ? "Priority -- click to unflag" : "Mark priority (reminds #announcements ~24h before, staff passphrase required)") + '">' +
+    (flagged ? "&#11088;" : "&#9734;") + '</button>';
 }
 
 function pad(n){ return String(n).padStart(2,"0"); }
@@ -501,21 +497,15 @@ document.querySelectorAll(".pill").forEach(function(p){
 });
 
 renderDow(); renderGrid(); renderSelected(); renderDocket(); renderNextDrop();
-renderStaffAuth();
 document.getElementById("genDate").textContent = BUILT.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
 
-// Priority flags (public, see CAL_API's own /list docstring) and staff
-// status load async and re-render once known -- the page is fully usable
-// before either resolves, this only adds the stars / the staff control.
+// Priority flags (public, see CAL_API's own /list docstring) load async
+// and re-render once known -- the page is fully usable before this
+// resolves, it only adds the gold stars for already-flagged events.
 fetch(CAL_API + "/list").then(function(r){ return r.json(); }).then(function(data){
   priorityFlags = (data && data.flags) || {};
   renderGrid(); renderSelected(); renderDocket();
 }).catch(function(){ /* stars just don't show -- never blocks the rest of the page */ });
-
-fetch(CAL_API + "/whoami", {credentials: "include"}).then(function(r){ return r.json(); }).then(function(data){
-  isStaff = !!(data && data.staff);
-  renderStaffAuth(); renderSelected(); renderDocket();
-}).catch(function(){ /* stays logged-out-looking -- never blocks the rest of the page */ });
 </script>
 
 </body></html>
