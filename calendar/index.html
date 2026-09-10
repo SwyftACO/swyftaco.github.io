@@ -297,7 +297,7 @@ const EVENTS = [{"id": "c:7744e72eb029", "date": "2026-08-24", "platform": "manu
 const TODAY = new Date();
 // Separate from TODAY on purpose -- this one IS meant to freeze at the last
 // rebuild, it's the "how fresh is this data" indicator in the footer.
-const BUILT = new Date(2026, 8, 9);
+const BUILT = new Date(2026, 8, 10);
 let filter = "all";
 let view = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
 let selectedDate = null;
@@ -305,62 +305,101 @@ let selectedDate = null;
 // Priority-reminder feature: click a date, click the star, get a reminder
 // posted in #announcements ~24h before it drops. The write side needs a
 // real backend (this static page has none of its own), so it lives on a
-// separate box -- see vps/calendar_priority_api.py. Auth is a single
-// shared staff passphrase, typed once and kept in this browser's own
-// localStorage, sent as a plain header on every toggle -- no login flow,
-// no redirect, no cross-origin cookie to silently fail (an earlier
-// Discord-OAuth version of this had exactly that problem: confirmed live
-// 2026-09-09 it just didn't work for a real user, almost certainly a
-// browser blocking the third-party cookie the whole flow depended on).
+// separate box -- see vps/calendar_priority_api.py. Auth is real Discord
+// OAuth, gated to STAFF_ROLE_ID -- clicking an unflagged star sends the
+// browser to /login (a normal top-level redirect, so Discord's own
+// consent screen and cookies work completely normally there, no
+// cross-origin involved). Once staff signs in, the callback redirects
+// back HERE with the signed session token in the URL fragment (never the
+// network -- GitHub Pages never sees it) instead of a cookie -- an
+// earlier version relied on a cross-origin cookie for this and it just
+// didn't work for a real user (confirmed live 2026-09-09, almost
+// certainly a browser blocking the third-party cookie). This page grabs
+// that token once, keeps it in localStorage, and resends it as a plain
+// X-Staff-Token header on every future toggle -- a header isn't subject
+// to any cookie policy at all, so there's nothing left to silently block.
 const CAL_API = "https://34-169-4-0.sslip.io/calendar-priority";
-const PASS_KEY = "swyft_staff_pass";
+const TOKEN_KEY = "swyft_staff_token";
+const PENDING_KEY = "swyft_pending_toggle"; // {id, priority} -- the click that triggered a login, resumed after it
 let priorityFlags = {}; // {event_id: true} -- public, not sensitive; see the API's own /list docstring
 
-function toggleRequest(id, nowOn, pass){
+function toggleRequest(id, nowOn, token){
   return fetch(CAL_API + "/toggle", {
     method: "POST",
-    headers: {"Content-Type": "application/json", "X-Staff-Passphrase": pass || ""},
+    headers: {"Content-Type": "application/json", "X-Staff-Token": token || ""},
     body: JSON.stringify({event_id: id, priority: nowOn}),
   });
 }
 
+function goToLogin(id, nowOn){
+  localStorage.setItem(PENDING_KEY, JSON.stringify({id: id, priority: nowOn}));
+  const here = location.href.split("#")[0];
+  location.href = CAL_API + "/login?return_to=" + encodeURIComponent(here);
+}
+
+function applyToggleResult(id, nowOn){
+  if(nowOn) priorityFlags[id] = true; else delete priorityFlags[id];
+  renderGrid(); renderSelected(); renderDocket();
+}
+
 function togglePriority(id, btn){
   const nowOn = !priorityFlags[id];
+  const token = localStorage.getItem(TOKEN_KEY) || "";
+  if(!token){ goToLogin(id, nowOn); return; }
   btn.disabled = true;
-  const stored = localStorage.getItem(PASS_KEY) || "";
-  toggleRequest(id, nowOn, stored).then(function(r){
-    if(r.status === 403){
-      // No passphrase yet, or it's wrong -- ask once, right here, and
-      // retry immediately with whatever was entered. This IS the whole
-      // "staff-only" gate; there's no separate login step to find first.
-      const entered = prompt("Staff passphrase (ask Jon if you don't have it):");
-      if(!entered){ btn.disabled = false; return; }
-      return toggleRequest(id, nowOn, entered).then(function(r2){
-        if(!r2.ok){ btn.disabled = false; alert("Wrong passphrase."); return; }
-        localStorage.setItem(PASS_KEY, entered);
-        return true;
-      });
+  toggleRequest(id, nowOn, token).then(function(r){
+    if(r.status === 401 || r.status === 403){
+      // Token missing/expired/rejected -- clear it and send them through
+      // login again rather than failing silently.
+      localStorage.removeItem(TOKEN_KEY);
+      btn.disabled = false;
+      goToLogin(id, nowOn);
+      return;
     }
-    if(!r.ok){ btn.disabled = false; alert("Could not update -- try again in a moment."); return; }
-    return true;
-  }).then(function(succeeded){
     btn.disabled = false;
-    if(!succeeded) return;
-    if(nowOn) priorityFlags[id] = true; else delete priorityFlags[id];
-    renderGrid(); renderSelected(); renderDocket();
+    if(!r.ok){ alert("Could not update -- try again in a moment."); return; }
+    applyToggleResult(id, nowOn);
   }).catch(function(){
     btn.disabled = false;
     alert("Could not reach the priority service -- try again in a moment.");
   });
 }
 
+// Resumes a click that had to detour through Discord login: reads the
+// token (or error) the oauth-callback appended to our own URL, stashes
+// the token, replays whatever toggle was pending, then scrubs the
+// fragment so a refresh/share of the URL doesn't carry the token along.
+function resumeAfterLogin(){
+  const hash = location.hash;
+  if(!hash) return;
+  const params = new URLSearchParams(hash.slice(1));
+  const token = params.get("staff_token");
+  const err = params.get("staff_error");
+  if(!token && !err) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  if(err){
+    localStorage.removeItem(PENDING_KEY);
+    alert("Couldn't verify a Staff role for that Discord account. If you're staff and think this is wrong, ping Jon.");
+    return;
+  }
+  localStorage.setItem(TOKEN_KEY, token);
+  const pendingRaw = localStorage.getItem(PENDING_KEY);
+  if(!pendingRaw) return;
+  localStorage.removeItem(PENDING_KEY);
+  let pending;
+  try { pending = JSON.parse(pendingRaw); } catch(e) { return; }
+  toggleRequest(pending.id, pending.priority, token).then(function(r){
+    if(r.ok) applyToggleResult(pending.id, pending.priority);
+  }).catch(function(){ /* they can just click the star again */ });
+}
+
 function priorityStarHtml(id){
   // Always a real, clickable button -- there's no separate "are you
-  // staff" step to find first. The passphrase prompt in togglePriority()
-  // IS the staff gate.
+  // staff" step to find first. togglePriority() itself sends anyone not
+  // already signed in through Discord login, gated to the Staff role.
   const flagged = !!priorityFlags[id];
   return '<button class="prio-star ' + (flagged ? "on" : "") + '" onclick="togglePriority(\'' + id + '\', this)" title="' +
-    (flagged ? "Priority -- click to unflag" : "Mark priority (reminds #announcements ~24h before, staff passphrase required)") + '">' +
+    (flagged ? "Priority -- click to unflag" : "Mark priority (reminds #announcements ~24h before -- requires staff Discord login)") + '">' +
     (flagged ? "&#11088;" : "&#9734;") + '</button>';
 }
 
@@ -498,6 +537,11 @@ document.querySelectorAll(".pill").forEach(function(p){
 
 renderDow(); renderGrid(); renderSelected(); renderDocket(); renderNextDrop();
 document.getElementById("genDate").textContent = BUILT.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+
+// Resume any star-click that had to detour through Discord login before
+// this page even had its first paint's worth of data -- see the function
+// itself for the full flow.
+resumeAfterLogin();
 
 // Priority flags (public, see CAL_API's own /list docstring) load async
 // and re-render once known -- the page is fully usable before this
