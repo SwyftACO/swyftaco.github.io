@@ -56,6 +56,14 @@
     "featured": false
   },
   {
+    "id": "c:cd25cb4e42d7",
+    "date": "2026-10-02",
+    "platform": "manual",
+    "label": "OP-17 Best Buy Restock",
+    "link": "https://discord.com/channels/1514470241017663529/1536781748304748684/1554143403640365136",
+    "featured": true
+  },
+  {
     "id": "c:9d16814795f1",
     "date": "2026-10-16",
     "platform": "manual",
@@ -77,6 +85,14 @@
     "platform": "manual",
     "label": "One Piece Mini Case Sets release",
     "link": "https://discord.com/channels/1514470241017663529/1536781748304748684/1550535463289491477",
+    "featured": true
+  },
+  {
+    "id": "c:0505f5f6c1a5",
+    "date": "2026-10-30",
+    "platform": "manual",
+    "label": "EB-05 Heroines Edition vol.2 Release",
+    "link": "https://discord.com/channels/1514470241017663529/1536781748304748684/1554143403640365136",
     "featured": true
   },
   {
@@ -102,6 +118,14 @@
     "label": "Delta Reign TCG set launches",
     "link": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxQTVBQdW9RQ1NGRVotSHhfU0F6aXlNa182YzZXMlJ3bzVtLUMxQXZmdTNWbTY1SFcycjJnb2FYbTNDeU1Ja1ZTajJSVDV6clFpMzY4T3l4LV9yVEVJalhfNjE2ZEhHOHBmeS1MM3FHUHdjVFB0RVBCN0R6ZEQ1TFFjSlpxNFlGWFhZMHRyR0tmT2hKMnFqLS0xU1FSRTRSTjFJQVpURFNUSWpYUQ?oc=5",
     "featured": false
+  },
+  {
+    "id": "c:acfc69a08cde",
+    "date": "2026-11-20",
+    "platform": "manual",
+    "label": "OP-18 The Dominance of God Release",
+    "link": "https://discord.com/channels/1514470241017663529/1536781748304748684/1554143403640365136",
+    "featured": true
   },
   {
     "id": "c:5b9f5d0a5332",
