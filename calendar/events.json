@@ -176,6 +176,14 @@
     "featured": false
   },
   {
+    "id": "c:e31e243aa852",
+    "date": "2027-01-29",
+    "platform": "op",
+    "label": "EB-06 drops",
+    "link": "https://en.onepiece-cardgame.com/products/eb06.html",
+    "featured": false
+  },
+  {
     "id": "c:5b9f5d0a5332",
     "date": "2027-02-01",
     "platform": "pokemon",
@@ -197,6 +205,14 @@
     "platform": "op",
     "label": "Nike G.T. Cut 4 x OP Spring 2027",
     "link": "https://news.google.com/rss/articles/CBMidkFVX3lxTE5nSHlqdDU2Wi1JLURLMUdCMTBpa1NCdTVOczgzNUdic1BzVGlRVHhQb09WTE1iTTJsdXRscXY2SE84M3RPTmdaMXBHTENEYXZ5SEV0Y3cwMElvQXd3c3VBeXlhRVJ5SFVMMER1RTFfNXE1ektzaUE?oc=5",
+    "featured": false
+  },
+  {
+    "id": "c:e6960493442e",
+    "date": "2027-03-05",
+    "platform": "op",
+    "label": "OP-19 booster pack drops",
+    "link": "https://en.onepiece-cardgame.com/products/op19.html",
     "featured": false
   }
 ]
